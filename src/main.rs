@@ -13,6 +13,8 @@ use diesel::prelude::*;
 
 use rocket_dyn_templates::{Template};
 use std::collections::HashMap;
+use handlebars::Handlebars;
+
 
 #[database("postgres")]
 pub struct DbConn(diesel::PgConnection);
