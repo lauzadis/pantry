@@ -13,8 +13,9 @@ use diesel::prelude::*;
 
 use rocket_dyn_templates::{Template};
 use std::collections::HashMap;
-use handlebars::Handlebars;
-
+use std::env;
+use dotenv::dotenv;
+use diesel::pg::PgConnection;
 
 #[database("postgres")]
 pub struct DbConn(diesel::PgConnection);
@@ -74,8 +75,17 @@ async fn delete_item(item_id: i32, conn: DbConn) -> Json<Item> {
 
 #[get("/")]
 async fn index() -> Template {
-    let mut context = HashMap::<String, String>::new();
-    context.insert("name".to_string(), "matas".to_string());
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let conn = PgConnection::establish(&database_url).expect(&format!("Error connecting to {}", database_url));
+    let results = items::table.load::<Item>(&conn).expect("Error loading items");
+
+    let mut context = HashMap::<String, Vec<Item>>::new();
+
+    // context.insert("name".to_string(), "matas".to_string());
+    context.insert("items".to_string(), results);
+    // context.insert("num_items".to_string(), IndexContext::from(5));
     Template::render("index", &context)
 }
 
@@ -86,5 +96,5 @@ fn rocket() -> _ {
     .attach(DbConn::fairing())
     .attach(Template::fairing())
     .mount("/", routes![index])
-    .mount("/api", routes![get_items, create_item, update_item, delete_item])
+    .mount("/api/item", routes![get_items, create_item, update_item, delete_item])
 }
