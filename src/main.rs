@@ -74,7 +74,7 @@ async fn delete_item(item_id: i32, conn: DbConn) -> Json<Item> {
 }
 
 #[get("/")]
-async fn index() -> Template {
+async fn item_index() -> Template {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -86,6 +86,13 @@ async fn index() -> Template {
     // context.insert("name".to_string(), "matas".to_string());
     context.insert("items".to_string(), results);
     // context.insert("num_items".to_string(), IndexContext::from(5));
+    Template::render("item", &context)
+}
+
+#[get("/")]
+async fn index() -> Template {
+    let context = HashMap::<String, Vec<Item>>::new();
+    // context.insert("num_items".to_string(), IndexContext::from(5));
     Template::render("index", &context)
 }
 
@@ -96,5 +103,6 @@ fn rocket() -> _ {
     .attach(DbConn::fairing())
     .attach(Template::fairing())
     .mount("/", routes![index])
+    .mount("/item", routes![item_index])
     .mount("/api/item", routes![get_items, create_item, update_item, delete_item])
 }

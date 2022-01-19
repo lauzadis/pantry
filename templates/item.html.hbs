@@ -1,0 +1,108 @@
+<html>
+    <head>
+        <meta charset="utf-8"/>
+    </head>
+    {{> frameworks }}
+    <body>
+        {{> navbar }}
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Quantity</th>
+                <th>Mass</th>
+            </tr>
+            {{#each items}}
+            <tr>
+                <td data="id">{{id}}</td>
+                <td data="name">{{name}}</td>
+                <td data="quantity">{{quantity}}</td>
+                <td data="mass">{{mass}}</td>
+                <td><button id="delete-item-{{id}}" item-id={{id}}>x</button></td>
+                <td><button id="update-item-{{id}}" item-id={{id}}>u</button></td>
+            </tr>
+
+            {{/each}}
+        </table>
+        <script>
+            $("[id^=delete-item]").click(function() {
+                $.ajax({
+                    method: "DELETE",
+                    url: "/api/item/" + $(this).attr("item-id"),
+                    success: function(data) {
+                        window.location.reload();
+                    }
+                });
+            });
+
+            $("[id^=update-item]").click(function() {
+                let row = $(this).parent().parent();
+                let id = row.children().first().text();
+                for (i = 0; i < 4; i++) {
+                    let child = row.children().eq(i);
+                    let field = child.attr("data");
+                    let val = child.text();
+                    console.log(val);
+                    child.html('<input type="text" id="update-' + field + '-' + id + '" name="' + field +'" value="' + val + '">');   
+                }
+                row.children().last().after('<td><button id="submit-update-item-' + id + '">s</button></td>');
+
+                $("[id^=submit-update-item]").click(function() {
+                    let data = {}
+                    data["id"] = id;
+                    data["name"] = $("#update-name-" + id).val();
+                    data["quantity"] = parseInt($("#update-quantity-" + id).val());
+                    data["mass"] = parseFloat($("#update-mass-" + id).val());
+                    $.ajax({
+                        method: "PUT",
+                        url: "/api/item/" + id,
+                        data: JSON.stringify(data),
+                        success: function(data) {
+                            window.location.reload();
+                        }
+
+                    })
+                });
+            });
+        </script>
+        <br>
+        
+        <form id="insertItemForm" onsubmit="return onSubmit(this)">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name"><br>
+
+            <label for="quantity">Quantity</label>
+            <input type="text" id="quantity" name="quantity"><br>
+
+            <label for="mass">Mass</label>
+            <input type="text" id="mass" name="mass"><br>
+            <input type="submit" value="Insert Item">
+        </form>
+        <script>
+            function onSubmit(form){
+                var rawData = $(form).serializeArray();
+                var data = {};
+                $.map(rawData, function(n, i){
+                    if (n['name'] == "quantity") {
+                        data[n['name']] = parseInt(n['value']);
+                    } else if (n['name'] == "mass") {
+                        data[n['name']] = parseFloat(n['value']);
+                    } else {
+                        data[n['name']] = n['value'];
+                    }
+                });
+
+                $.ajax({
+                    type: "POST",
+                    url: "/api/item",
+                    data: JSON.stringify(data),
+                    success: function(data) {
+                        window.location.reload();
+                    }
+                });
+                return false; //don't submit
+            }
+        </script>
+    </body>
+    
+</html>
