@@ -1,91 +1,83 @@
 #[macro_use] extern crate rocket;
-#[macro_use] extern crate diesel;
 
-mod schema;
 mod item;
-use crate::item::{Item, ChangedItem};
+use crate::item::{Item};
 
-use crate::schema::items;
-
-use rocket::serde::{json::Json};
-use rocket_sync_db_pools::database;
-use diesel::prelude::*;
+use rocket::{serde::{json::Json}};
 
 use rocket_dyn_templates::{Template};
 use std::collections::HashMap;
 use std::env;
 use dotenv::dotenv;
-use diesel::pg::PgConnection;
 
-#[database("postgres")]
-pub struct DbConn(diesel::PgConnection);
+use mongodb::{Client, Database, Collection};
+use rocket::{get, State};
+use futures::stream::{TryStreamExt};
+use bson::{doc};
+
 
 #[get("/")]
-async fn get_items(conn: DbConn) -> Json<Vec<Item>> {
-    let results = conn.run(|c|
-        items::table.load::<Item>(c)
-        .expect("Error loading Items"))
-        .await;
-
+async fn get_items(mongo: &State<MongoState>) -> Json<Vec<Item>> {
+    let db = &mongo.db;
+    let items: Collection<Item> = db.collection::<Item>("item");
+    
+    let cursor = items.find(None, None).await.unwrap();
+    let results: Vec<Item> = cursor.try_collect().await.unwrap_or_else(|_| vec![]);
+    println!("{:?}", results);
     Json(results)
 }
 
 #[post("/", data = "<new_item>")]
-async fn create_item(conn: DbConn, new_item: Json<ChangedItem>) -> Json<Item> {
-    let item = conn.run(|c| 
-        diesel::insert_into(items::table)
-        .values(new_item.into_inner())
-        .get_result::<Item>(c)
-        .expect("Error creating Item")
-    ).await;
+async fn create_item(mongo: &State<MongoState>, new_item: Json<Item>) -> Json<Item> {
+    let new_item = new_item.into_inner();
 
-    Json(item)
+    let db = &mongo.db;
+    let items: Collection<Item> = db.collection::<Item>("item");
+    
+    let inserted_id = items.insert_one(new_item, None).await.unwrap().inserted_id;
+
+    let filter = bson::doc! {"_id": inserted_id};
+    match items.find_one(filter, None).await.unwrap() {
+        None => panic!("Failed to insert item"),
+        Some(item) => Json(item)
+    }
 }
 
 #[put("/<item_id>", data="<updated_item>")]
-async fn update_item(item_id: i32, conn: DbConn, updated_item: Json<ChangedItem>) -> Json<Item> {
-    let /*mut*/ updated_item = updated_item.into_inner();
-    // if updated_item.quantity == Some(0) {
-    //     updated_item.quantity = None;
-    // } else if updated_item.mass == Some(BigDecimal::from_str("0.0").unwrap()) {
-    //     updated_item.mass = None;
-    // }
+async fn update_item(mongo: &State<MongoState>, item_id: &str, updated_item: Json<Item>) -> Json<Item> {
+    let item_id = bson::oid::ObjectId::parse_str(item_id).expect("Failed to parse ObjectId");
+    let updated_item = bson::to_bson(&updated_item.into_inner()).unwrap();
+    let updated_item = doc!{"$set": updated_item};
 
-    let item = conn.run(move |c|
-        diesel::update(
-            items::table.find(item_id))
-            .set(updated_item)
-            .get_result::<Item>(c)
-            .expect("Unable to update Item")
-    ).await;
+    let items = mongo.db.collection("item");
+    let item_to_update = items.find_one(doc!{"_id": item_id}, None).await.unwrap().expect("Failed to find item");
 
-    Json(item)
+    let update_result = items.update_one(item_to_update, updated_item, None).await.unwrap();
+
+    let items = mongo.db.collection::<Item>("item");
+    let updated_item = items.find_one(doc!{"_id": item_id}, None).await.unwrap().unwrap();
+    Json(updated_item)
 }
 
 #[delete("/<item_id>")]
-async fn delete_item(item_id: i32, conn: DbConn) -> Json<Item> {
-    let item = conn.run(move |c|
-        diesel::delete(items::table.find(item_id))
-        .get_result::<Item>(c)
-        .expect("Unable to delete Item")
-    ).await;
+async fn delete_item(mongo: &State<MongoState>, item_id: &str) -> Json<Item> {    
+    let item_id = bson::oid::ObjectId::parse_str(item_id).expect("Failed to parse ObjectId");
 
-    Json(item)
+    let items = mongo.db.collection::<Item>("item");
+
+    let filter = bson::doc! {"_id": item_id};
+    match items.find_one_and_delete(filter, None).await {
+        Ok(Some(item)) => Json(item),
+        _ => panic!("Failed to delete item")
+    }
 }
 
 #[get("/")]
-async fn item_index() -> Template {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let conn = PgConnection::establish(&database_url).expect(&format!("Error connecting to {}", database_url));
-    let results = items::table.load::<Item>(&conn).expect("Error loading items");
-
+async fn item_index(mongo: &State<MongoState>) -> Template {
     let mut context = HashMap::<String, Vec<Item>>::new();
+    let items = get_items(mongo).await.into_inner();
 
-    // context.insert("name".to_string(), "matas".to_string());
-    context.insert("items".to_string(), results);
-    // context.insert("num_items".to_string(), IndexContext::from(5));
+    context.insert("items".to_string(), items);
     Template::render("item", &context)
 }
 
@@ -96,13 +88,28 @@ async fn index() -> Template {
     Template::render("index", &context)
 }
 
+struct MongoState {
+    db: Database,
+}
 
 #[launch]
-fn rocket() -> _ {
+async fn rocket() -> _ {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let client = Client::with_uri_str(database_url).await.unwrap();
+
+    let database_name = env::var("DATABASE_NAME").expect("DATABASE_NAME must be set");
+    let db = client.database(&database_name);
+
+    for coll_name in db.list_collection_names(None).await {
+        println!("collection: {:?}", coll_name);
+    }
+
     rocket::build()
-    .attach(DbConn::fairing())
+    .manage(MongoState {db})
     .attach(Template::fairing())
     .mount("/", routes![index])
     .mount("/item", routes![item_index])
-    .mount("/api/item", routes![get_items, create_item, update_item, delete_item])
+    .mount("/api/item", routes![get_items, create_item, delete_item, update_item])
 }

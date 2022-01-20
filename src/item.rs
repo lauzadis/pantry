@@ -1,18 +1,17 @@
 use serde_derive::{Serialize, Deserialize};
 use bigdecimal::BigDecimal;
-use crate::schema::items;
+use mongodb::bson;
 
-#[derive(Queryable, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Item {
-    id: i32,
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    id: Option<bson::oid::ObjectId>,
     name: String,
     quantity: Option<i32>,
-    mass: Option<BigDecimal>
+    mass: Option<BigDecimal>,
 }
 
-#[derive(Insertable, Deserialize, AsChangeset)]
-#[changeset_options(treat_none_as_null = "true")] // treat "None" as NULL instead of skipping it in the diesel::update()
-#[table_name="items"]
+#[derive(Deserialize)]
 pub struct ChangedItem {
     name: String,
     pub quantity: Option<i32>,

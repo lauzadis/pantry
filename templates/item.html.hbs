@@ -14,12 +14,12 @@
             </tr>
             {{#each items}}
             <tr>
-                <td data="id">{{id}}</td>
+                <td data="id">{{_id.$oid}}</td>
                 <td data="name">{{name}}</td>
                 <td data="quantity">{{quantity}}</td>
                 <td data="mass">{{mass}}</td>
-                <td><button id="delete-item-{{id}}" item-id={{id}}>x</button></td>
-                <td><button id="update-item-{{id}}" item-id={{id}}>u</button></td>
+                <td><button id="delete-item-{{_id.$oid}}" item-id={{_id.$oid}}>x</button></td>
+                <td><button id="update-item-{{_id.$oid}}" item-id={{_id.$oid}}>u</button></td>
             </tr>
 
             {{/each}}
