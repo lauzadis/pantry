@@ -52,7 +52,7 @@ async fn update_item(mongo: &State<MongoState>, item_id: &str, updated_item: Jso
     let items = mongo.db.collection("item");
     let item_to_update = items.find_one(doc!{"_id": item_id}, None).await.unwrap().expect("Failed to find item");
 
-    let update_result = items.update_one(item_to_update, updated_item, None).await.unwrap();
+    items.update_one(item_to_update, updated_item, None).await.unwrap();
 
     let items = mongo.db.collection::<Item>("item");
     let updated_item = items.find_one(doc!{"_id": item_id}, None).await.unwrap().unwrap();
@@ -101,10 +101,6 @@ async fn rocket() -> _ {
 
     let database_name = env::var("DATABASE_NAME").expect("DATABASE_NAME must be set");
     let db = client.database(&database_name);
-
-    for coll_name in db.list_collection_names(None).await {
-        println!("collection: {:?}", coll_name);
-    }
 
     rocket::build()
     .manage(MongoState {db})
