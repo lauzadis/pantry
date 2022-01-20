@@ -98,7 +98,15 @@ async fn index() -> Template {
 
 
 #[launch]
-fn rocket() -> _ {
+async fn rocket() -> _ {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let client = Client::with_uri_str(database_url).await.unwrap();
+
+    let database_name = env::var("DATABASE_NAME").expect("DATABASE_NAME must be set");
+    let db = client.database(&database_name);
+
     rocket::build()
     .attach(DbConn::fairing())
     .attach(Template::fairing())
