@@ -5,6 +5,7 @@ use serde_derive::{Serialize, Deserialize};
 pub enum Measurement {
     Volume {value: f32, unit: VolumeUnit},
     Mass {value: f32, unit: MassUnit},
+    Count {value: i32},
 }
 
 
