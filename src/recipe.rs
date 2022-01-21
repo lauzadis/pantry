@@ -1,36 +1,56 @@
 use serde_derive::{Serialize, Deserialize};
-use bigdecimal::BigDecimal;
-use crate::schema::items;
 use crate::Item;
 
-#[derive(Queryable, Serialize, Deserialize)]
+use rocket_dyn_templates::{Template};
+use std::collections::HashMap;
+
+use mongodb::{Client, Database, Collection};
+use rocket::{get, State};
+use futures::stream::{TryStreamExt};
+use bson::{doc};
+use crate::mongo::MongoState;
+use crate::ingredient::Ingredient;
+use crate::measurement::{Measurement, VolumeUnit, MassUnit};
+
+
+#[derive(Serialize, Deserialize)]
 pub struct Recipe {
-    id: i32,
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    id: Option<bson::oid::ObjectId>,
     name: String,
     steps: Vec<Step>,
 }
 
-#[derive(Queryable, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Step {
-    id: i32,
-    recipe_id: i32,
-    seq_id: i32,
-    text: String,
+    instructions: String,
+    ingredients: Vec<Ingredient>,
 }
 
-#[derive(Insertable, Deserialize, AsChangeset)]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name="recipes"]
-pub struct ChangedRecipe {
-    name: String,
-    steps: Vec<Step>,
+#[get("/")]
+pub async fn recipe_index(mongo: &State<MongoState>) -> Template {
+
+    let test_recipe = Recipe {
+        id: None,
+        name: "Brown Basmati Rice".to_string(),
+        steps: vec! [
+            Step {
+                instructions: "Obtain 1 cup of basmati rice.".to_string(),
+                ingredients: vec! [
+                    Ingredient {
+                        item: Item {id: None, name: "Brown Basmati Rice".to_string(), quantity: Some(5), mass: None},
+                        amount: Measurement::Volume{value: 1.0, unit: VolumeUnit::Cup},
+                    }
+                ]
+            }
+        ]
+    };
+
+    let recipes: Vec<Recipe> = vec![test_recipe];
+
+    let mut context = HashMap::<String, Vec<Recipe>>::new();
+
+    context.insert("recipes".to_string(), recipes);
+    Template::render("recipe", &context)
 }
 
-#[derive(Insertable, Deserialize, AsChangeset)]
-#[changeset_options(treat_none_as_null = "true")]
-#[table_name="steps"]
-pub struct ChangedStep {
-    recipe_id: i32,
-    text: String,
-    items: Vec<Item>,
-}

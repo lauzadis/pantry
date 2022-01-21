@@ -6,6 +6,12 @@ use mongo::MongoState;
 mod item;
 use crate::item::{Item, get_items, update_item, create_item, delete_item, item_index};
 
+mod recipe;
+mod ingredient;
+mod measurement;
+use crate::recipe::{recipe_index};
+
+
 use rocket_dyn_templates::{Template};
 use std::collections::HashMap;
 use std::env;
@@ -38,4 +44,5 @@ async fn rocket() -> _ {
     .mount("/", routes![index])
     .mount("/item", routes![item_index])
     .mount("/api/item", routes![get_items, create_item, delete_item, update_item])
+    .mount("/recipe", routes![recipe_index])
 }

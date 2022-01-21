@@ -6,10 +6,10 @@ use crate::mongo::MongoState;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Item {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    id: Option<bson::oid::ObjectId>,
-    name: String,
-    quantity: Option<i32>,
-    mass: Option<BigDecimal>,
+    pub id: Option<bson::oid::ObjectId>,
+    pub name: String,
+    pub quantity: Option<i32>,
+    pub mass: Option<BigDecimal>,
 }
 
 #[get("/")]
