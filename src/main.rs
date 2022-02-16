@@ -9,7 +9,7 @@ use crate::item::{Item, get_items, update_item, create_item, delete_item, item_i
 mod recipe;
 mod ingredient;
 mod measurement;
-use crate::recipe::{recipe_index};
+use crate::recipe::{recipe_index, get_recipes};
 
 
 use rocket_dyn_templates::{Template};
@@ -45,4 +45,5 @@ async fn rocket() -> _ {
     .mount("/item", routes![item_index])
     .mount("/api/item", routes![get_items, create_item, delete_item, update_item])
     .mount("/recipe", routes![recipe_index])
+    .mount("/api/recipe", routes![get_recipes])
 }
